@@ -204,19 +204,23 @@ io.on("connection", (socket) => {
         }
         let totalRetry = 10;
         let retry = 0;
+
         const checkOnlineRoom = async () => {
           if (retry >= totalRetry) return;
-          const newOnlineRoom = await OnlineRoomModel.findById(newOnlineRoomId);
-          if (newOnlineRoom.user1 && newOnlineRoom.user2) {
-            console.log("Both user appears means online room is valid");
 
+          const newOnlineRoom = await OnlineRoomModel.findById(newOnlineRoomId);
+
+          if (newOnlineRoom.user1 && newOnlineRoom.user2) {
+            console.log("Both users appear, meaning online room is valid");
             return true;
           } else {
-            console.log("Online room is not valid running function again");
+            console.log("Online room is not valid, running function again");
             retry++;
-            return new Promise((resolve) => {
-              setTimeout(() => resolve(checkOnlineRoom()), 500);
-            });
+
+            // Wait for 500ms before retrying
+            await new Promise((resolve) => setTimeout(resolve, 500));
+
+            return checkOnlineRoom(); // Recursive call after waiting
           }
         };
         const validOnlineRoom = await checkOnlineRoom();
@@ -276,6 +280,8 @@ io.on("connection", (socket) => {
         });
         socket.emit("complete-response", { _id: newOnlineHistory._id });
       }
+    } else {
+      socket.emit("submit-error", { error: "payload-not-correct" });
     }
   };
   const getOnlineHistory = async (data) => {
@@ -286,7 +292,16 @@ io.on("connection", (socket) => {
         const findOpponentHistory = await OnlineHistoryModel.findOne({
           roomId,
           _id: { $ne: resultId },
-        });
+        })
+          .populate({ path: "mcqs" })
+          .populate({
+            path: "roomId",
+            select: "_id subjectId yearId topicId quizType",
+            populate: {
+              path: "subjectId yearId topicId",
+              select: "subject year topic",
+            },
+          });
         if (findOpponentHistory) {
           return findOpponentHistory;
         } else {
@@ -320,7 +335,7 @@ app.use((req, res, next) => {
 app.use(bodyParser.json());
 app.use(
   cors({
-    origin: "*",
+    origin: "https://db44p3gk-5173.inc1.devtunnels.ms",
   })
 );
 app.use("/api/quiz", quizRoutes);

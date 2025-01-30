@@ -343,59 +343,97 @@ router.get("/get-online-room/:onlineRoomId/:userId", async (req, res) => {
 });
 // Getting online history or status function
 router.get("/get-online-history/:resultId/:roomId", async (req, res) => {
-  // Destructuring payload
-  const { resultId, roomId } = req.params;
-  // Validate payload
-  if (!resultId) {
-    return res
-      .status(404)
-      .json({ success: false, message: "Result Id or Room Id is not exist!" });
-  }
-  // Finding room
-  const findOnlineRoom = await OnlineRoomModel.findOne({
-    _id: roomId,
-    isAlive: true,
-  });
-  // First I find my opponent history
-  const findOpponentHistory = await OnlineHistoryModel.findOne({
-    roomId,
-    _id: { $ne: resultId },
-  });
-  const myHistory = await OnlineHistoryModel.findOne({
-    roomId,
-    _id: resultId,
-  });
-  const myUser = await UserModel.findOne({
-    clerkId: myHistory.user,
-  });
-  let opponentUser;
-  if (findOnlineRoom.user1 === myHistory.user) {
-    opponentUser = await UserModel.findOne({
-      clerkId: findOnlineRoom.user2,
-    }).select("fullName imageUrl clerkId");
-  } else {
-    opponentUser = await UserModel.findOne({
-      clerkId: findOnlineRoom.user1,
-    }).select("fullName imageUrl clerkId");
-  }
+  try {
+    // Destructuring payload
+    const { resultId, roomId } = req.params;
+    // Validate payload
+    if (!resultId) {
+      return res
+        .status(404)
+        .json({
+          success: false,
+          message: "Result Id or Room Id is not exist!",
+        });
+    }
+    // Finding room
+    const findOnlineRoom = await OnlineRoomModel.findOne({
+      _id: roomId,
+      isAlive: true,
+    });
+    if (!findOnlineRoom) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Room is expired!" });
+    }
+    // First I find my opponent history
+    const findOpponentHistory = await OnlineHistoryModel.findOne({
+      roomId,
+      _id: { $ne: resultId },
+    })
+      .populate({ path: "mcqs" })
+      .populate({
+        path: "roomId",
+        select: "_id subjectId yearId topicId quizType",
+        populate: {
+          path: "subjectId yearId topicId",
+          select: "subject year topic",
+        },
+      });
+    const myHistory = await OnlineHistoryModel.findOne({
+      roomId,
+      _id: resultId,
+    })
+      .populate({ path: "mcqs" })
+      .populate({
+        path: "roomId",
+        select: "_id subjectId yearId topicId quizType",
+        populate: {
+          path: "subjectId yearId topicId",
+          select: "subject year topic",
+        },
+      });
+    // const myUser = await UserModel.findOne({
+    //   clerkId: myHistory.user,
+    // });
+    let opponentUser;
+    if (findOnlineRoom.user1 === myHistory.user) {
+      opponentUser = await UserModel.findOne({
+        clerkId: findOnlineRoom.user2,
+      }).select("fullName imageUrl clerkId");
+    } else {
+      opponentUser = await UserModel.findOne({
+        clerkId: findOnlineRoom.user1,
+      }).select("fullName imageUrl clerkId");
+    }
 
-  // If Opponents history exist then I find my history and return and data
-  if (findOpponentHistory) {
-    res.status(200).json({
-      success: true,
-      isPending: false,
-      data: { myHistory, opponentHistory: findOpponentHistory },
-    });
-  } else {
-    // If I didn't find any opponent hsitory thats mean my opponent is still playing
-    res.status(200).json({
-      success: true,
-      isPending: true,
-      data: {
-        opponentUser,
-        time: { fullTime: findOnlineRoom.seconds, timeTaken: myHistory.time },
-      },
-    });
+    // If Opponents history exist then I find my history and return and data
+    if (findOpponentHistory) {
+      await OnlineRoomModel.findOneAndUpdate(
+        {
+          _id: roomId,
+        },
+        { isAlive: false }
+      );
+      res.status(200).json({
+        success: true,
+        isPending: false,
+        data: { myHistory, opponentUser, opponentHistory: findOpponentHistory },
+      });
+    } else {
+      // If I didn't find any opponent hsitory thats mean my opponent is still playing
+      res.status(200).json({
+        success: true,
+        isPending: true,
+        data: {
+          myData: myHistory,
+          opponentUser,
+          time: { fullTime: findOnlineRoom.seconds, timeTaken: myHistory.time },
+        },
+      });
+    }
+  } catch (error) {
+    res.status(400).json({ success: false, message: "Something went wrong" });
+    console.log(error);
   }
 });
 export default router;

@@ -1,7 +1,7 @@
 import { model, Schema } from "mongoose";
 
 const onlineHistorySchema = new Schema({
-  roomId: { type: Schema.Types.ObjectId, ref: "onlinerooms" },
+  roomId: { type: Schema.Types.ObjectId, ref: "onlineroom" },
   mcqs: [{ type: Schema.Types.ObjectId, ref: "mcqs" }],
   user: { type: String },
   roomType: { type: String, required: true },
