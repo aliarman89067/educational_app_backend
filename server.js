@@ -159,6 +159,8 @@ io.on("connection", (socket) => {
             user1Id = userId;
             user2Id = findSameStudent.user;
           } else {
+            console.log("Room not found!");
+
             // If we find an onlineRoom that means user 1 already created we just pass user2 clerk id
             // So we do that
             await OnlineRoomModel.findByIdAndUpdate(
@@ -214,6 +216,8 @@ io.on("connection", (socket) => {
             console.log("Both users appear, meaning online room is valid");
             return true;
           } else {
+            console.log("User 1", newOnlineRoom.user1);
+            console.log("User 2", newOnlineRoom.user2);
             console.log("Online room is not valid, running function again");
             retry++;
 
@@ -285,6 +289,7 @@ io.on("connection", (socket) => {
     }
   };
   const getOnlineHistory = async (data) => {
+    let timeoutId;
     const { resultId, roomId } = data;
     if (resultId && roomId) {
       const getOpponentHistory = async () => {
@@ -307,10 +312,11 @@ io.on("connection", (socket) => {
         } else {
           console.log("Running again");
           return new Promise((resolve) => {
-            setTimeout(() => resolve(getOpponentHistory()), 1000);
+            timeoutId = setTimeout(() => resolve(getOpponentHistory()), 1000);
           });
         }
       };
+      clearTimeout(timeoutId);
       const getOnlineHistoryRes = await getOpponentHistory();
 
       if (getOnlineHistoryRes) {
@@ -325,6 +331,15 @@ io.on("connection", (socket) => {
   socket.on("create-online-room", createRoom);
   socket.on("online-submit", submitOnlineRoom);
   socket.on("get-online-history", getOnlineHistory);
+
+  socket.on("disconnect", () => {
+    console.log("User disconnected:", socket.id);
+
+    // Remove event listeners when the socket disconnects
+    socket.off("create-online-room", createRoom);
+    socket.off("online-submit", submitOnlineRoom);
+    socket.off("get-online-history", getOnlineHistory);
+  });
 });
 
 app.use(express.json());
@@ -335,7 +350,7 @@ app.use((req, res, next) => {
 app.use(bodyParser.json());
 app.use(
   cors({
-    origin: "https://db44p3gk-5173.inc1.devtunnels.ms",
+    origin: "*",
   })
 );
 app.use("/api/quiz", quizRoutes);

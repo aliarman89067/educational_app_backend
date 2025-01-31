@@ -348,12 +348,10 @@ router.get("/get-online-history/:resultId/:roomId", async (req, res) => {
     const { resultId, roomId } = req.params;
     // Validate payload
     if (!resultId) {
-      return res
-        .status(404)
-        .json({
-          success: false,
-          message: "Result Id or Room Id is not exist!",
-        });
+      return res.status(404).json({
+        success: false,
+        message: "Result Id or Room Id is not exist!",
+      });
     }
     // Finding room
     const findOnlineRoom = await OnlineRoomModel.findOne({
