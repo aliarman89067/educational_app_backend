@@ -11,10 +11,12 @@ const onlineRoomSchema = new Schema({
   user2: { type: String },
   user1SessionId: { type: String },
   user2SessionId: { type: String },
-  isAlive: { type: Boolean, required: true },
+  isUser1Alive: { type: Boolean, required: true },
+  isUser2Alive: { type: Boolean, required: true },
   seconds: { type: String, required: true },
   isEnded: { type: Boolean, required: true, default: false },
 });
+onlineRoomSchema.index({ uniqueKey: 1 }), { uniqueKey: true };
 
 const OnlineRoomModel = model("onlineroom", onlineRoomSchema);
 export default OnlineRoomModel;
