@@ -13,6 +13,9 @@ const onlineRoomSchema = new Schema({
   user2SessionId: { type: String },
   isUser1Alive: { type: Boolean, required: true },
   isUser2Alive: { type: Boolean, required: true },
+  user1RemainingTime: { type: String },
+  user2RemainingTime: { type: String },
+  resignation: { type: String, default: "" },
   seconds: { type: String, required: true },
   isEnded: { type: Boolean, required: true, default: false },
 });

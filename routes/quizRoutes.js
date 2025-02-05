@@ -170,23 +170,50 @@ router.put("/leave-solo-room", async (req, res) => {
 router.put("/leave-online-room", async (req, res) => {
   try {
     // Destructuring request payload
-    const { roomId } = req.body;
+    const { roomId, userId } = req.body;
     // Validating request payload values
-    if (!roomId) {
+    if (!roomId || !userId) {
       return res
         .status(404)
-        .json({ success: false, message: "Solo Room Id not exist!" });
+        .json({ success: false, message: "Payload is not correct!" });
     }
     // Update Solo Room isAlive value to false to this room can be shutdowm
-    await OnlineRoomModel.findByIdAndUpdate(roomId, { isAlive: false });
+    const getOnlineRoom = await OnlineRoomModel.findOne({
+      _id: roomId,
+      isEnded: false,
+    });
+    if (!getOnlineRoom) {
+      return res.status(404).json({
+        success: false,
+        message: "Can't find any online room with this fields!",
+      });
+    }
+    if (getOnlineRoom.user1 === userId || getOnlineRoom.user2 === userId) {
+      await OnlineRoomModel.findOneAndUpdate(
+        {
+          _id: roomId,
+          isEnded: false,
+        },
+        {
+          isUser1Alive: false,
+          isUser2Alive: false,
+          resignation: userId,
+        },
+        { new: true }
+      );
+    } else {
+      return res
+        .status(400)
+        .json({ success: false, message: "Can't find any matching user!" });
+    }
     res.status(200).json({
       success: true,
-      message:
-        "This Online room is shut down mean isAlive property set to false",
+      message: "Set room to resignation.",
     });
   } catch (error) {
     // In case we face any error
     console.log(error);
+    res.status(400).json({ success: false, message: "Seomthing went wrong!" });
   }
 });
 // Create History of the Quiz Room and De-Active the target room
@@ -276,105 +303,137 @@ router.put("/reactive-solo-room", async (req, res) => {
     console.log(error);
   }
 });
-router.get("/get-online-room/:onlineRoomId/:userId", async (req, res) => {
-  try {
-    // Destructuring onlineRoomId from params
-    const { onlineRoomId, userId } = req.params;
-    // Validating request payload
-    if (!onlineRoomId || !userId) {
-      return res.status(404).json({
-        success: false,
-        message: "Online Room Id or User Id is not exist!",
-      });
-    }
-    // Validating is Solo Room is Alive
-    const isOnlineRoomAlive = await OnlineRoomModel.findOne({
-      _id: onlineRoomId,
-    }).select("isUser1Alive isUser2Alive user1 user2");
-    // If its not alive thats means we need to navigate user to quiz page again
-    if (
-      (!isOnlineRoomAlive.isUser1Alive && !isOnlineRoomAlive.isUser2Alive) ||
-      !isOnlineRoomAlive
-    ) {
-      return res.status(200).json({
-        success: false,
-        error: "room-expired",
-        message: "This Online Room is not valid. Its expired!",
-      });
-    }
-    // Know Check individual user by id
-    if (isOnlineRoomAlive.user1 === userId && !isOnlineRoomAlive.isUser1Alive) {
-      // Validate User 1
-      return res.status(200).json({
-        success: false,
-        error: "room-expired",
-        message: "This room is expired for user 1",
-      });
-    } else if (
-      isOnlineRoomAlive.user2 === userId &&
-      !isOnlineRoomAlive.isUser2Alive
-    ) {
-      // Validatet User 2
-      return res.status(200).json({
-        success: false,
-        error: "room-expired",
-        message: "This room is expired for user 2",
-      });
-    }
-    if (
-      !isOnlineRoomAlive.user1 === userId &&
-      !isOnlineRoomAlive.user2 === userId
-    ) {
-      return res.status(200).json({
-        success: false,
-        error: "server-error",
-        message: "User id is not matching any of the online room user id's",
-      });
-    }
-    // Getting All Data like Subject, SubjectId, Year, YearId, MCQS, IsAlive
-    const onlineRoomData = await OnlineRoomModel.findOne({
-      _id: onlineRoomId,
-    })
-      .populate({ path: "subjectId", select: "_id subject" })
-      .populate({ path: "yearId", select: "_id year" })
-      .populate({ path: "topicId", select: "_id topic" })
-      .populate({ path: "quizes" });
+router.get(
+  "/get-online-room/:onlineRoomId/:userId/:sessionId",
+  async (req, res) => {
+    try {
+      // Destructuring onlineRoomId from params
+      const { onlineRoomId, userId, sessionId } = req.params;
+      // Validating request payload
+      if (!onlineRoomId || !userId) {
+        return res.status(404).json({
+          success: false,
+          message: "Params payload is not correct",
+        });
+      }
+      // Validating is Solo Room is Alive
+      const isOnlineRoomAlive = await OnlineRoomModel.findOne({
+        _id: onlineRoomId,
+      }).select("isUser1Alive isUser2Alive user1 user2");
+      // If its not alive thats means we need to navigate user to quiz page again
+      if (
+        (!isOnlineRoomAlive.isUser1Alive && !isOnlineRoomAlive.isUser2Alive) ||
+        !isOnlineRoomAlive
+      ) {
+        return res.status(200).json({
+          success: false,
+          error: "room-expired",
+          message: "This Online Room is not valid. Its expired!",
+        });
+      }
+      // Now Check individual user by id
+      if (
+        isOnlineRoomAlive.user1 === userId &&
+        !isOnlineRoomAlive.isUser1Alive
+      ) {
+        // Validate User 1
+        return res.status(200).json({
+          success: false,
+          error: "room-expired",
+          message: "This room is expired for user 1",
+        });
+      } else if (
+        isOnlineRoomAlive.user2 === userId &&
+        !isOnlineRoomAlive.isUser2Alive
+      ) {
+        // Validatet User 2
+        return res.status(200).json({
+          success: false,
+          error: "room-expired",
+          message: "This room is expired for user 2",
+        });
+      }
+      if (
+        !isOnlineRoomAlive.user1 === userId &&
+        !isOnlineRoomAlive.user2 === userId
+      ) {
+        return res.status(200).json({
+          success: false,
+          error: "server-error",
+          message: "User id is not matching any of the online room user id's",
+        });
+      }
+      // Getting All Data like Subject, SubjectId, Year, YearId, MCQS, IsAlive
+      const onlineRoomData = await OnlineRoomModel.findOne({
+        _id: onlineRoomId,
+      })
+        .populate({ path: "subjectId", select: "_id subject" })
+        .populate({ path: "yearId", select: "_id year" })
+        .populate({ path: "topicId", select: "_id topic" })
+        .populate({ path: "quizes" });
 
-    // Finding opponent
-    // Validating that both user exist in online room
-    if (!onlineRoomData.user1 || !onlineRoomData.user2) {
-      return res.status(200).json({
-        success: false,
-        error: "server-error",
-        message:
-          "One user is missing in online room means its not completely updated!",
+      // Finding opponent
+      // Validating that both user exist in online room
+      if (!onlineRoomData.user1 || !onlineRoomData.user2) {
+        return res.status(200).json({
+          success: false,
+          error: "server-error",
+          message:
+            "One user is missing in online room means its not completely updated!",
+        });
+      }
+      let opponent;
+      let remainingTime = "";
+      if (onlineRoomData.user1 === userId) {
+        const updatedOnlineRoom = await OnlineRoomModel.findOneAndUpdate(
+          {
+            _id: onlineRoomId,
+            isEnded: false,
+          },
+          {
+            user1SessionId: sessionId,
+          },
+          { new: true }
+        );
+        remainingTime = updatedOnlineRoom.user1RemainingTime;
+        opponent = await UserModel.findOne({
+          clerkId: onlineRoomData.user2,
+        });
+      } else if (onlineRoomData.user2 === userId) {
+        const updatedOnlineRoom = await OnlineRoomModel.findOneAndUpdate(
+          {
+            _id: onlineRoomId,
+            isEnded: false,
+          },
+          {
+            user2SessionId: sessionId,
+          },
+          { new: true }
+        );
+        remainingTime = updatedOnlineRoom.user2RemainingTime;
+        opponent = await UserModel.findOne({
+          clerkId: onlineRoomData.user1,
+        });
+      }
+      if (!opponent) {
+        return res.status(200).json({
+          success: false,
+          error: "opponent-left",
+          message: "Can't find your opponent",
+        });
+      }
+      // Returning response
+      res.status(200).json({
+        success: true,
+        data: { onlineRoomData, opponent, remainingTime },
       });
+    } catch (error) {
+      // In case we face any error
+      console.log(error);
+      throw new Error("Something went wrong!");
     }
-    let opponent;
-    if (onlineRoomData.user1 === userId) {
-      opponent = await UserModel.findOne({
-        clerkId: onlineRoomData.user2,
-      });
-    } else if (onlineRoomData.user2 === userId) {
-      opponent = await UserModel.findOne({
-        clerkId: onlineRoomData.user1,
-      });
-    }
-    if (!opponent) {
-      return res.status(200).json({
-        success: false,
-        error: "opponent-left",
-        message: "Can't find your opponent",
-      });
-    }
-    // Returning response
-    res.status(200).json({ success: true, data: { onlineRoomData, opponent } });
-  } catch (error) {
-    // In case we face any error
-    console.log(error);
-    throw new Error("Something went wrong!");
   }
-});
+);
 // Getting online history or status function
 router.get("/get-online-history/:resultId/:roomId", async (req, res) => {
   try {
@@ -467,6 +526,52 @@ router.get("/get-online-history/:resultId/:roomId", async (req, res) => {
   } catch (error) {
     res.status(400).json({ success: false, message: "Something went wrong" });
     console.log(error);
+  }
+});
+router.put("/update-onlineroom-values", async (req, res) => {
+  try {
+    const { userId, roomId, remainingSeconds } = req.body;
+    if (!userId || !roomId) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Payload is not correct!" });
+    }
+    const getOnlineRoom = await OnlineRoomModel.findOne({
+      _id: roomId,
+      isEnded: false,
+    });
+    if (!getOnlineRoom) {
+      return res.status(404).json({
+        success: false,
+        message: "Online room with this fields not found!",
+      });
+    }
+    if (getOnlineRoom.user1 === userId) {
+      await OnlineRoomModel.findOneAndUpdate(
+        { _id: roomId, isEnded: false },
+        {
+          user1RemainingTime: remainingSeconds,
+        },
+        { new: true }
+      );
+    } else if (getOnlineRoom.user2 === userId) {
+      await OnlineRoomModel.findOneAndUpdate(
+        { _id: roomId, isEnded: false },
+        {
+          user2RemainingTime: remainingSeconds,
+        },
+        { new: true }
+      );
+    } else {
+      return res
+        .status(400)
+        .json({ success: false, message: "Can't find any user" });
+    }
+    console.log("Online room updated.");
+    res.status(200).json({ success: true, message: "Online room updated." });
+  } catch (error) {
+    console.log(error);
+    res.status(400).json({ success: false, message: "Something went wrong!" });
   }
 });
 export default router;

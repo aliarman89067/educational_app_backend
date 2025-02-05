@@ -67,7 +67,6 @@ io.on("connection", (socket) => {
 
       const searchStudent = async () => {
         if (retryCount >= maxRetries) return null;
-
         // Find matching handshake room
         const query = {
           subjectId,
@@ -176,7 +175,7 @@ io.on("connection", (socket) => {
           socket.emit("no-student-found", { error: "Failed to find student" });
         }
 
-        // Cleanup handshake rooms
+        // // Cleanup handshake rooms
         await OnlineHandShakeRoomModel.updateMany(
           { _id: { $in: [newHandShakeRoom._id, findSameStudent._id] } },
           { isAlive: false }
@@ -204,26 +203,41 @@ io.on("connection", (socket) => {
         time: completeTime,
       });
       const findOnlineRoom = await OnlineRoomModel.findById(roomId);
-      if (findOnlineRoom.user1 === userId) {
-        await OnlineRoomModel.findOneAndUpdate(
-          { _id: roomId },
-          { isUser1Alive: false }
-        );
-        io.to(findOnlineRoom.user2SessionId).emit("opponent-completed", {
-          isCompleted: true,
-          time: completeTime,
-        });
-        socket.emit("complete-response", { _id: newOnlineHistory._id });
-      } else if (findOnlineRoom.user2 === userId) {
-        await OnlineRoomModel.findOneAndUpdate(
-          { _id: roomId },
-          { isUser2Alive: false }
-        );
-        io.to(findOnlineRoom.user1SessionId).emit("opponent-completed", {
-          isCompleted: true,
-          time: completeTime,
-        });
-        socket.emit("complete-response", { _id: newOnlineHistory._id });
+      if (findOnlineRoom.resignation) {
+        if (findOnlineRoom.user1 === userId) {
+          io.to(findOnlineRoom.user2SessionId).emit("opponent-resign", {
+            isCompleted: true,
+            time: completeTime,
+          });
+        } else if (findOnlineRoom.user2 === userId) {
+          io.to(findOnlineRoom.user1SessionId).emit("opponent-resign", {
+            isCompleted: true,
+            time: completeTime,
+          });
+        }
+        return;
+      } else {
+        if (findOnlineRoom.user1 === userId) {
+          await OnlineRoomModel.findOneAndUpdate(
+            { _id: roomId },
+            { isUser1Alive: false }
+          );
+          io.to(findOnlineRoom.user2SessionId).emit("opponent-completed", {
+            isCompleted: true,
+            time: completeTime,
+          });
+          socket.emit("complete-response", { _id: newOnlineHistory._id });
+        } else if (findOnlineRoom.user2 === userId) {
+          await OnlineRoomModel.findOneAndUpdate(
+            { _id: roomId },
+            { isUser2Alive: false }
+          );
+          io.to(findOnlineRoom.user1SessionId).emit("opponent-completed", {
+            isCompleted: true,
+            time: completeTime,
+          });
+          socket.emit("complete-response", { _id: newOnlineHistory._id });
+        }
       }
     } else {
       socket.emit("submit-error", { error: "payload-not-correct" });
@@ -267,9 +281,28 @@ io.on("connection", (socket) => {
       socket.emit("get-online-history-error", { error: "payload-error" });
     }
   };
+  const onlineResignSubmit = async (data) => {
+    console.log("Outside the paylaod boundry");
+    const { roomId, userId, selectedStates, mcqs, completeTime } = data;
+    if (roomId && userId && selectedStates && mcqs && completeTime) {
+      console.log("Inside the paylaod boundry");
+      const newOnlineHistory = await OnlineHistoryModel.create({
+        roomId,
+        mcqs,
+        user: userId,
+        roomType: "online-room",
+        quizIdAndValue: selectedStates,
+        time: completeTime,
+      });
+      socket.emit("complete-resign-response", { _id: newOnlineHistory._id });
+    } else {
+      console.log("This payload is not correct");
+    }
+  };
   socket.on("create-online-room", createRoom);
   socket.on("online-submit", submitOnlineRoom);
   socket.on("get-online-history", getOnlineHistory);
+  socket.on("online-resign-submit", onlineResignSubmit);
 
   socket.on("disconnect", () => {
     console.log("User disconnected:", socket.id);
@@ -278,6 +311,7 @@ io.on("connection", (socket) => {
     socket.off("create-online-room", createRoom);
     socket.off("online-submit", submitOnlineRoom);
     socket.off("get-online-history", getOnlineHistory);
+    socket.off("online-resign-submit", onlineResignSubmit);
   });
 });
 
