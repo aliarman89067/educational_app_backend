@@ -74,8 +74,10 @@ io.on("connection", (socket) => {
           sessionId: { $ne: sessionId },
           isAlive: true,
         };
+        console.log("Find matching student query");
         findSameStudent = await OnlineHandShakeRoomModel.findOne(query);
         if (findSameStudent) {
+          console.log("Finded same student");
           return await handleOnlineRoom();
         } else {
           retryCount++;
@@ -125,7 +127,6 @@ io.on("connection", (socket) => {
           update,
           options
         );
-
         // Update session ID if needed
         if (onlineRoom.user1 === userId) {
           onlineRoom.user1SessionId = sessionId;
@@ -176,8 +177,8 @@ io.on("connection", (socket) => {
         }
 
         // // Cleanup handshake rooms
-        await OnlineHandShakeRoomModel.updateMany(
-          { _id: { $in: [newHandShakeRoom._id, findSameStudent._id] } },
+        await OnlineHandShakeRoomModel.findOneAndUpdate(
+          { _id: findSameStudent._id },
           { isAlive: false }
         );
       } else {

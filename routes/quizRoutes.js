@@ -567,11 +567,16 @@ router.put("/update-onlineroom-values", async (req, res) => {
         .status(400)
         .json({ success: false, message: "Can't find any user" });
     }
-    console.log("Online room updated.");
     res.status(200).json({ success: true, message: "Online room updated." });
   } catch (error) {
     console.log(error);
     res.status(400).json({ success: false, message: "Something went wrong!" });
   }
+});
+router.get("/isActive", (req, res) => {
+  console.log("Tab is Active");
+});
+router.get("/non-Active", (req, res) => {
+  console.log("Tab is Closed");
 });
 export default router;
