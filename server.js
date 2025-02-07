@@ -302,11 +302,7 @@ io.on("connection", (socket) => {
       console.log("This payload is not correct");
     }
   };
-  socket.on("create-online-room", createRoom);
-  socket.on("online-submit", submitOnlineRoom);
-  socket.on("get-online-history", getOnlineHistory);
-  socket.on("online-resign-submit", onlineResignSubmit);
-  socket.on("online-resign-by-leave", async (data) => {
+  const onlineLeaveResign = async (data) => {
     const { completeTime, mcqs, roomId, selectedStates, userId } = data;
     if (completeTime || mcqs || roomId || selectedStates || userId) {
       // Finding and Validating and Updating Online Room Logic
@@ -360,7 +356,64 @@ io.on("connection", (socket) => {
     } else {
       // TODO:Handling Error
     }
-  });
+  };
+  const requestRematch = async (data) => {
+    const { roomId, userId } = data;
+    if (roomId && userId) {
+      const findOnlineRoom = await OnlineRoomModel.findOne({
+        _id: roomId,
+        isEnded: true,
+        isUser1Alive: false,
+        isUser2Alive: false,
+      });
+      if (findOnlineRoom) {
+        socket.emit("rematch-found");
+        if (findOnlineRoom.user1 === userId) {
+          io.to(findOnlineRoom.user2SessionId).emit("get-rematch-request");
+        } else if (findOnlineRoom.user2 === userId) {
+          io.to(findOnlineRoom.user1SessionId).emit("get-rematch-request");
+        }
+      } else {
+        // TODO:Payload error handle
+      }
+    } else {
+      // TODO:Payload error handle
+    }
+  };
+  const cancelRematchRequest = async (data) => {
+    const { roomId, userId } = data;
+    if (roomId && userId) {
+      const findOnlineRoom = await OnlineRoomModel.findOne({
+        _id: roomId,
+        isEnded: true,
+        isUser1Alive: false,
+        isUser2Alive: false,
+      });
+      if (findOnlineRoom) {
+        if (findOnlineRoom.user1 === userId) {
+          io.to(findOnlineRoom.user2SessionId).emit("get-cancel-rematch");
+          socket.emit("get-cancel-rematch");
+        } else if (findOnlineRoom.user2 === userId) {
+          io.to(findOnlineRoom.user1SessionId).emit("get-cancel-rematch");
+          socket.emit("get-cancel-rematch");
+        } else {
+          // TODO: Handling userid is not correct
+        }
+      } else {
+        // TODO: Handling onlineroom not found
+      }
+    } else {
+      // TODO: Handling payload error
+    }
+  };
+
+  socket.on("create-online-room", createRoom);
+  socket.on("online-submit", submitOnlineRoom);
+  socket.on("get-online-history", getOnlineHistory);
+  socket.on("online-resign-submit", onlineResignSubmit);
+  socket.on("online-resign-by-leave", onlineLeaveResign);
+  socket.on("request-rematch", requestRematch);
+  socket.on("cancel-rematch-request", cancelRematchRequest);
 
   socket.on("disconnect", async () => {
     // Remove event listeners when the socket disconnects
@@ -368,6 +421,9 @@ io.on("connection", (socket) => {
     socket.off("online-submit", submitOnlineRoom);
     socket.off("get-online-history", getOnlineHistory);
     socket.off("online-resign-submit", onlineResignSubmit);
+    socket.off("online-resign-by-leave", onlineLeaveResign);
+    socket.off("request-rematch", requestRematch);
+    socket.off("cancel-rematch-request", cancelRematchRequest);
   });
 });
 
