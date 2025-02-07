@@ -508,10 +508,16 @@ router.get("/get-online-history/:resultId/:roomId", async (req, res) => {
 
     // If Opponents history exist then I find my history and return and data
     if (findOpponentHistory) {
+      const resignation = findOnlineRoom.resignation ?? "";
       res.status(200).json({
         success: true,
         isPending: false,
-        data: { myHistory, opponentUser, opponentHistory: findOpponentHistory },
+        data: {
+          myHistory,
+          opponentUser,
+          opponentHistory: findOpponentHistory,
+          resignation,
+        },
       });
     } else {
       // If I didn't find any opponent hsitory thats mean my opponent is still playing
