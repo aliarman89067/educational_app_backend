@@ -283,10 +283,8 @@ io.on("connection", (socket) => {
     }
   };
   const onlineResignSubmit = async (data) => {
-    console.log("Outside the paylaod boundry");
     const { roomId, userId, selectedStates, mcqs, completeTime } = data;
     if (roomId && userId && selectedStates && mcqs && completeTime) {
-      console.log("Inside the paylaod boundry");
       const newOnlineHistory = await OnlineHistoryModel.create({
         roomId,
         mcqs,
@@ -304,9 +302,37 @@ io.on("connection", (socket) => {
   socket.on("online-submit", submitOnlineRoom);
   socket.on("get-online-history", getOnlineHistory);
   socket.on("online-resign-submit", onlineResignSubmit);
+  socket.on("testing", (data) => {
+    console.log(data);
+  });
 
-  socket.on("disconnect", () => {
-    console.log("User disconnected:", socket.id);
+  socket.on("disconnect", async () => {
+    // User leave the quiz means we need to call resign
+    const findOnlineRoom = await OnlineRoomModel.findOne({
+      $or: [
+        {
+          user1SessionId: socket.id,
+        },
+        {
+          user2SessionId: socket.id,
+        },
+      ],
+      isEnded: false,
+    });
+
+    // if (findOnlineRoom.user1SessionId === socket.id) {
+    //   await OnlineRoomModel.findOneAndUpdate(findOnlineRoom._id, {
+    //     isUser1Alive: false,
+    //     isUser2Alive: false,
+    //     resignation: findOnlineRoom.user1,
+    //   });
+    // } else if (findOnlineRoom.user2SessionId === socket.id) {
+    //   await OnlineRoomModel.findOneAndUpdate(findOnlineRoom._id, {
+    //     isUser1Alive: false,
+    //     isUser2Alive: false,
+    //     resignation: findOnlineRoom.user2,
+    //   });
+    // }
 
     // Remove event listeners when the socket disconnects
     socket.off("create-online-room", createRoom);
@@ -325,6 +351,10 @@ app.use(bodyParser.json());
 app.use(
   cors({
     origin: "*",
+    methods: ["POST", "OPTIONS"], // Explicitly allow needed methods
+    allowedHeaders: ["Content-Type", "Authorization"],
+    exposedHeaders: ["Content-Length"],
+    maxAge: 86400,
   })
 );
 app.use("/api/quiz", quizRoutes);

@@ -210,6 +210,7 @@ router.put("/leave-online-room", async (req, res) => {
       success: true,
       message: "Set room to resignation.",
     });
+    console.log("Its done");
   } catch (error) {
     // In case we face any error
     console.log(error);
@@ -528,55 +529,54 @@ router.get("/get-online-history/:resultId/:roomId", async (req, res) => {
     console.log(error);
   }
 });
-router.put("/update-onlineroom-values", async (req, res) => {
-  try {
-    const { userId, roomId, remainingSeconds } = req.body;
-    if (!userId || !roomId) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Payload is not correct!" });
-    }
-    const getOnlineRoom = await OnlineRoomModel.findOne({
-      _id: roomId,
-      isEnded: false,
-    });
-    if (!getOnlineRoom) {
-      return res.status(404).json({
-        success: false,
-        message: "Online room with this fields not found!",
-      });
-    }
-    if (getOnlineRoom.user1 === userId) {
-      await OnlineRoomModel.findOneAndUpdate(
-        { _id: roomId, isEnded: false },
-        {
-          user1RemainingTime: remainingSeconds,
-        },
-        { new: true }
-      );
-    } else if (getOnlineRoom.user2 === userId) {
-      await OnlineRoomModel.findOneAndUpdate(
-        { _id: roomId, isEnded: false },
-        {
-          user2RemainingTime: remainingSeconds,
-        },
-        { new: true }
-      );
-    } else {
-      return res
-        .status(400)
-        .json({ success: false, message: "Can't find any user" });
-    }
-    res.status(200).json({ success: true, message: "Online room updated." });
-  } catch (error) {
-    console.log(error);
-    res.status(400).json({ success: false, message: "Something went wrong!" });
-  }
+// router.put("/update-onlineroom-values", async (req, res) => {
+//   try {
+//     const { userId, roomId, remainingSeconds } = req.body;
+//     console.log(userId, roomId, remainingSeconds);
+//     if (!userId || !roomId) {
+//       return res
+//         .status(404)
+//         .json({ success: false, message: "Payload is not correct!" });
+//     }
+//     const getOnlineRoom = await OnlineRoomModel.findOne({
+//       _id: roomId,
+//       isEnded: false,
+//     });
+//     if (!getOnlineRoom) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "Online room with this fields not found!",
+//       });
+//     }
+//     if (getOnlineRoom.user1 === userId) {
+//       await OnlineRoomModel.findOneAndUpdate(
+//         { _id: roomId, isEnded: false },
+//         {
+//           user1RemainingTime: remainingSeconds,
+//         },
+//         { new: true }
+//       );
+//     } else if (getOnlineRoom.user2 === userId) {
+//       await OnlineRoomModel.findOneAndUpdate(
+//         { _id: roomId, isEnded: false },
+//         {
+//           user2RemainingTime: remainingSeconds,
+//         },
+//         { new: true }
+//       );
+//     } else {
+//       return res
+//         .status(400)
+//         .json({ success: false, message: "Can't find any user" });
+//     }
+//     res.status(200).json({ success: true, message: "Online room updated." });
+//   } catch (error) {
+//     console.log(error);
+//     res.status(400).json({ success: false, message: "Something went wrong!" });
+//   }
+// });
+router.get("/testing", (req, res) => {
+  console.log("Hello WOrld It's Working");
 });
-router.get("/isActive", (req, res) => {
-  console.log("Tab is Active");
-});
-router.get("/non-Active", (req, res) => {
-  console.log("Tab is Closed");
-});
+
 export default router;
