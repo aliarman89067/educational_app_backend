@@ -194,6 +194,8 @@ io.on("connection", (socket) => {
   };
   const submitOnlineRoom = async (data) => {
     const { roomId, userId, selectedStates, mcqs, completeTime } = data;
+    console.log("Online Submit Payload");
+    console.log(roomId, userId, selectedStates, mcqs, completeTime);
     if (roomId && userId && selectedStates && mcqs && completeTime) {
       const newOnlineHistory = await OnlineHistoryModel.create({
         roomId,
@@ -204,6 +206,8 @@ io.on("connection", (socket) => {
         time: completeTime,
       });
       const findOnlineRoom = await OnlineRoomModel.findById(roomId);
+      console.log("Target Online Room");
+      console.log(findOnlineRoom);
       if (findOnlineRoom.resignation) {
         if (findOnlineRoom.user1 === userId) {
           io.to(findOnlineRoom.user2SessionId).emit("opponent-resign", {
@@ -302,38 +306,63 @@ io.on("connection", (socket) => {
   socket.on("online-submit", submitOnlineRoom);
   socket.on("get-online-history", getOnlineHistory);
   socket.on("online-resign-submit", onlineResignSubmit);
-  socket.on("testing", (data) => {
-    console.log(data);
+  socket.on("online-resign-by-leave", async (data) => {
+    const { completeTime, mcqs, roomId, selectedStates, userId } = data;
+    if (completeTime || mcqs || roomId || selectedStates || userId) {
+      // Finding and Validating and Updating Online Room Logic
+      const getOnlineRoom = await OnlineRoomModel.findOne({
+        _id: roomId,
+        isEnded: false,
+      });
+      if (!getOnlineRoom) {
+        // TODO:Handling Error
+      }
+      if (getOnlineRoom.user1 === userId || getOnlineRoom.user2 === userId) {
+        await OnlineRoomModel.findOneAndUpdate(
+          {
+            _id: roomId,
+            isEnded: false,
+          },
+          {
+            isUser1Alive: false,
+            isUser2Alive: false,
+            resignation: userId,
+            isEnded: true,
+          },
+          { new: true }
+        );
+        // Creating online history object and checking resignation and sending opponent an socket event
+        await OnlineHistoryModel.create({
+          roomId,
+          mcqs,
+          user: userId,
+          roomType: "online-room",
+          quizIdAndValue: selectedStates,
+          time: completeTime,
+        });
+        const findOnlineRoom = await OnlineRoomModel.findById(roomId);
+        if (findOnlineRoom.resignation) {
+          if (findOnlineRoom.user1 === userId) {
+            io.to(findOnlineRoom.user2SessionId).emit("opponent-resign", {
+              isCompleted: true,
+              time: completeTime,
+            });
+          } else if (findOnlineRoom.user2 === userId) {
+            io.to(findOnlineRoom.user1SessionId).emit("opponent-resign", {
+              isCompleted: true,
+              time: completeTime,
+            });
+          }
+        }
+      } else {
+        // TODO:Handling Error
+      }
+    } else {
+      // TODO:Handling Error
+    }
   });
 
   socket.on("disconnect", async () => {
-    // User leave the quiz means we need to call resign
-    const findOnlineRoom = await OnlineRoomModel.findOne({
-      $or: [
-        {
-          user1SessionId: socket.id,
-        },
-        {
-          user2SessionId: socket.id,
-        },
-      ],
-      isEnded: false,
-    });
-
-    // if (findOnlineRoom.user1SessionId === socket.id) {
-    //   await OnlineRoomModel.findOneAndUpdate(findOnlineRoom._id, {
-    //     isUser1Alive: false,
-    //     isUser2Alive: false,
-    //     resignation: findOnlineRoom.user1,
-    //   });
-    // } else if (findOnlineRoom.user2SessionId === socket.id) {
-    //   await OnlineRoomModel.findOneAndUpdate(findOnlineRoom._id, {
-    //     isUser1Alive: false,
-    //     isUser2Alive: false,
-    //     resignation: findOnlineRoom.user2,
-    //   });
-    // }
-
     // Remove event listeners when the socket disconnects
     socket.off("create-online-room", createRoom);
     socket.off("online-submit", submitOnlineRoom);
@@ -351,7 +380,7 @@ app.use(bodyParser.json());
 app.use(
   cors({
     origin: "*",
-    methods: ["POST", "OPTIONS"], // Explicitly allow needed methods
+    methods: ["POST", "GET", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
     exposedHeaders: ["Content-Length"],
     maxAge: 86400,

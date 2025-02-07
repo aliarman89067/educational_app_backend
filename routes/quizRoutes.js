@@ -198,6 +198,7 @@ router.put("/leave-online-room", async (req, res) => {
           isUser1Alive: false,
           isUser2Alive: false,
           resignation: userId,
+          isEnded: true,
         },
         { new: true }
       );
@@ -441,16 +442,24 @@ router.get("/get-online-history/:resultId/:roomId", async (req, res) => {
     // Destructuring payload
     const { resultId, roomId } = req.params;
     // Validate payload
-    if (!resultId) {
+    if (!resultId || !roomId) {
       return res.status(404).json({
         success: false,
         message: "Result Id or Room Id is not exist!",
       });
     }
     // Finding room
-    const findOnlineRoom = await OnlineRoomModel.findOne({
-      _id: roomId,
-    });
+    const findOnlineRoom = await OnlineRoomModel.findOneAndUpdate(
+      {
+        _id: roomId,
+      },
+      {
+        isEnded: true,
+      },
+      {
+        new: true,
+      }
+    );
     if (!findOnlineRoom) {
       return res
         .status(400)
@@ -499,14 +508,6 @@ router.get("/get-online-history/:resultId/:roomId", async (req, res) => {
 
     // If Opponents history exist then I find my history and return and data
     if (findOpponentHistory) {
-      await OnlineRoomModel.findOneAndUpdate(
-        {
-          _id: roomId,
-        },
-        {
-          isEnded: true,
-        }
-      );
       res.status(200).json({
         success: true,
         isPending: false,
